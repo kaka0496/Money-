@@ -1,0 +1,214 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Money $∞</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes glow {
+      0% { text-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700, 0 0 30px #FFD700; }
+      50% { text-shadow: 0 0 20px #FFD700, 0 0 30px #FFD700, 0 0 40px #FFD700; }
+      100% { text-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700, 0 0 30px #FFD700; }
+    }
+    .glowing {
+      animation: glow 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center">
+  <div class="container mx-auto p-4">
+    <h1 class="text-4xl font-bold text-center mb-8">Money $∞</h1>
+    
+    <!-- Main Number Display -->
+    <div class="text-center mb-12">
+      <h2 class="text-2xl mb-4">Today's Number</h2>
+      <div id="mainNumber" class="text-8xl font-extrabold text-yellow-400"></div>
+      <p id="updateStatus" class="text-lg mt-2"></p>
+    </div>
+
+    <!-- Admin Update Section -->
+    <div class="mb-12 text-center">
+      <h3 class="text-xl mb-4">Admin Update</h3>
+      <input id="passwordInput" type="password" placeholder="Enter password" class="p-2 rounded bg-gray-800 text-white border border-gray-600">
+      <input id="numberInput" type="number" min="0" max="99" placeholder="New number (00-99)" class="p-2 rounded bg-gray-800 text-white border border-gray-600">
+      <button id="updateButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Update Number</button>
+      <p id="adminMessage" class="text-red-400 mt-2"></p>
+    </div>
+
+    <!-- Calendar Section -->
+    <div class="mb-12">
+      <h3 class="text-xl mb-4 text-center">Historical Numbers</h3>
+      <div class="flex justify-center mb-4">
+        <select id="yearSelect" class="p-2 rounded bg-gray-800 text-white border border-gray-600 mr-2"></select>
+        <select id="monthSelect" class="p-2 rounded bg-gray-800 text-white border border-gray-600"></select>
+      </div>
+      <div id="calendar" class="grid grid-cols-7 gap-2 text-center"></div>
+    </div>
+  </div>
+
+  <script>
+    const today = new Date('2025-05-21T23:23:00');
+    const startDate = new Date('2022-01-01');
+    const password = 'Rajkumar123@';
+
+    // Initialize localStorage data
+    if (!localStorage.getItem('numberData')) {
+      const data = { lastNumber: '××', lastUpdate: null, history: {} };
+      for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        data.history[dateStr] = '××';
+      }
+      localStorage.setItem('numberData', JSON.stringify(data));
+    }
+
+    // Load data
+    const data = JSON.parse(localStorage.getItem('numberData'));
+    let currentYear = today.getFullYear();
+    let currentMonth = today.getMonth();
+
+    // Display main number
+    function displayMainNumber() {
+      const mainNumber = document.getElementById('mainNumber');
+      const updateStatus = document.getElementById('updateStatus');
+      mainNumber.textContent = data.lastNumber;
+      
+      const lastUpdate = data.lastUpdate ? new Date(data.lastUpdate) : null;
+      const isToday = lastUpdate && lastUpdate.toDateString() === today.toDateString();
+      
+      if (isToday && today.getHours() < 23 && today.getMinutes() < 59) {
+        mainNumber.classList.add('glowing');
+        updateStatus.textContent = 'Updated today, glowing until 23:59!';
+      } else {
+        mainNumber.classList.remove('glowing');
+        updateStatus.textContent = lastUpdate ? `Last updated: ${lastUpdate.toLocaleDateString()}` : 'No updates yet';
+      }
+    }
+
+    // Populate year and month selectors
+    function populateSelectors() {
+      const yearSelect = document.getElementById('yearSelect');
+      const monthSelect = document.getElementById('monthSelect');
+      for (let year = 2022; year <= today.getFullYear(); year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelect.appendChild(option);
+      }
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      months.forEach((month, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = month;
+        monthSelect.appendChild(option);
+      });
+      yearSelect.value = currentYear;
+      monthSelect.value = currentMonth;
+    }
+
+    // Display calendar
+    function displayCalendar(year, month) {
+      const calendar = document.getElementById('calendar');
+      calendar.innerHTML = '<div class="font-bold">Sun</div><div class="font-bold">Mon</div><div class="font-bold">Tue</div><div class="font-bold">Wed</div><div class="font-bold">Thu</div><div class="font-bold">Fri</div><div class="font-bold">Sat</div>';
+      
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      for (let i = 0; i < firstDay; i++) {
+        calendar.innerHTML += '<div></div>';
+      }
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const number = data.history[dateStr];
+        calendar.innerHTML += `<div class="p-2 bg-gray-800 rounded">${day}<br><span class="text-yellow-400">${number}</span></div>`;
+      }
+    }
+
+    // Handle number update
+    document.getElementById('updateButton').addEventListener('click', () => {
+      const passwordInput = document.getElementById('passwordInput').value;
+      const numberInput = document.getElementById('numberInput').value;
+      const adminMessage = document.getElementById('adminMessage');
+      
+      if (passwordInput !== password) {
+        adminMessage.textContent = 'Incorrect password!';
+        return;
+      }
+      
+      const num = parseInt(numberInput);
+      if (isNaN(num) || num < 0 || num > 99) {
+        adminMessage.textContent = 'Please enter a number between 00 and 99!';
+        return;
+      }
+      
+      const formattedNumber = String(num).padStart(2, '0');
+      const todayStr = today.toISOString().split('T')[0];
+      data.lastNumber = formattedNumber;
+      data.lastUpdate = today.toISOString();
+      data.history[todayStr] = formattedNumber;
+      localStorage.setItem('numberData', JSON.stringify(data));
+      
+      adminMessage.textContent = 'Number updated successfully!';
+      displayMainNumber();
+      if (currentYear == today.getFullYear() && currentMonth == today.getMonth()) {
+        displayCalendar(currentYear, currentMonth);
+      }
+    });
+
+    // Handle year/month change
+    document.getElementById('yearSelect').addEventListener('change', (e) => {
+      currentYear = parseInt(e.target.value);
+      displayCalendar(currentYear, currentMonth);
+    });
+    document.getElementById('monthSelect').addEventListener('change', (e) => {
+      currentMonth = parseInt(e.target.value);
+      displayCalendar(currentYear, currentMonth);
+    });
+
+    // Initialize
+    displayMainNumber();
+    populateSelectors();
+    displayCalendar(currentYear, currentMonth);
+  </script>
+</body>
+</html>
